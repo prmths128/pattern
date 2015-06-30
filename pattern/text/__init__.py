@@ -34,22 +34,22 @@ from pattern.text.tree import SLASH, WORD, POS, CHUNK, PNP, REL, ANCHOR, LEMMA, 
 def decode_string(v, encoding="utf-8"):
     """ Returns the given value as a Unicode string (if possible).
     """
-    if isinstance(encoding, basestring):
+    if isinstance(encoding, str):
         encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
-    if isinstance(v, str):
+    if isinstance(v, bytes):
         for e in encoding:
             try: return v.decode(*e)
             except:
                 pass
         return v
-    return unicode(v)
+    return str(v)
 
 def encode_string(v, encoding="utf-8"):
     """ Returns the given value as a Python byte string (if possible).
     """
-    if isinstance(encoding, basestring):
+    if isinstance(encoding, str):
         encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
-    if isinstance(v, unicode):
+    if isinstance(v, str):
         for e in encoding:
             try: return v.encode(*e)
             except:
@@ -72,7 +72,7 @@ def ngrams(string, n=3, punctuation=PUNCTUATION, continuous=False):
         return [w for w in s if (isinstance(w, Word) and w.string or w) not in punctuation]
     if n <= 0:
         return []
-    if isinstance(string, basestring):
+    if isinstance(string, str):
         s = [strip_punctuation(s.split(" ")) for s in tokenize(string)]
     if isinstance(string, Sentence):
         s = [strip_punctuation(string)]
@@ -99,7 +99,7 @@ def pprint(string, token=[WORD, POS, CHUNK, PNP], column=4):
     """ Pretty-prints the output of Parser.parse() as a table with outlined columns.
         Alternatively, you can supply a tree.Text or tree.Sentence object.
     """
-    if isinstance(string, basestring):
+    if isinstance(string, str):
         print("\n\n".join([table(sentence, fill=column) for sentence in Text(string, token)]))
     if isinstance(string, Text):
         print("\n\n".join([table(sentence, fill=column) for sentence in string]))
@@ -199,17 +199,16 @@ class lazylist(list):
 # Named entity rules are used to annotate proper nouns (NNP's: Google = NNP-ORG).
 # When available, the parser will use a faster and more accurate language model (SLP, SVM, NB, ...).
 
-#--- LEXICON ---------------------------------------------------------------------------------------
-
+#--- LEXICON -------------------------------------------------------------------------------------
 def _read(path, encoding="utf-8", comment=";;;"):
     """ Returns an iterator over the lines in the file at the given path,
         strippping comments and decoding each line to Unicode.
     """
     if path:
-        if isinstance(path, basestring) and os.path.exists(path):
+        if isinstance(path, str) and os.path.exists(path):
             # From file path.
             f = open(path, "rb")
-        elif isinstance(path, basestring):
+        elif isinstance(path, str):
             # From string.
             f = path.splitlines()
         else:
@@ -667,7 +666,7 @@ class Parser(object):
         self.default    = default
         self.language   = language
         # Load data.
-        f = lambda s: isinstance(s, basestring) or hasattr(s, "read")
+        f = lambda s: isinstance(s, str) or hasattr(s, "read")
         if f(lexicon):
             # Known words.
             self.lexicon = Lexicon(path=lexicon)
@@ -765,8 +764,8 @@ class Parser(object):
         if tokenize is True:
             s = self.find_tokens(s, **kwargs)
         if isinstance(s, (list, tuple)):
-            s = [isinstance(s, basestring) and s.split(" ") or s for s in s]
-        if isinstance(s, basestring):
+            s = [isinstance(s, str) and s.split(" ") or s for s in s]
+        if isinstance(s, str):
             s = [s.split(" ") for s in s.split("\n")]
         # Unicode.
         for i in range(len(s)):
@@ -823,20 +822,20 @@ class Parser(object):
 
 TOKENS = "tokens"
 
-class TaggedString(unicode):
+class TaggedString(str):
 
     def __new__(self, string, tags=["word"], language=None):
         """ Unicode string with tags and language attributes.
             For example: TaggedString("cat/NN/NP", tags=["word", "pos", "chunk"]).
         """
         # From a TaggedString:
-        if isinstance(string, unicode) and hasattr(string, "tags"):
+        if isinstance(string, str) and hasattr(string, "tags"):
             tags, language = string.tags, string.language
         # From a TaggedString.split(TOKENS) list:
         if isinstance(string, list):
             string = [[[x.replace("/", "&slash;") for x in token] for token in s] for s in string]
             string = "\n".join(" ".join("/".join(token) for token in s) for s in string)
-        s = unicode.__new__(self, string)
+        s = str.__new__(self, string)
         s.tags = list(tags)
         s.language = language
         return s
@@ -846,12 +845,12 @@ class TaggedString(unicode):
             where each token is a list of word + tags.
         """
         if sep != TOKENS:
-            return unicode.split(self, sep)
+            return str.split(self, sep)
         if len(self) == 0:
             return []
         return [[[x.replace("&slash;", "/") for x in token.split("/")]
             for token in sentence.split(" ")]
-                for sentence in unicode.split(self, "\n")]
+                for sentence in str.split(self, "\n")]
 
 #--- UNIVERSAL TAGSET ------------------------------------------------------------------------------
 # The default part-of-speech tagset used in Pattern is Penn Treebank II.
@@ -968,7 +967,7 @@ def find_tokens(string, punctuation=PUNCTUATION, abbreviations=ABBREVIATIONS, re
     for a, b in replace.items():
         string = re.sub(a, b, string)
     # Handle Unicode quotes.
-    if isinstance(string, unicode):
+    if isinstance(string, str):
         string = string.replace(u"“", u" “ ")
         string = string.replace(u"”", u" ” ")
         string = string.replace(u"‘", u" ‘ ")
@@ -1947,11 +1946,11 @@ class Sentiment(lazydict):
         # A synset id.
         # Sentiment("a-00193480") => horrible => (-0.6, 1.0)   (English WordNet)
         # Sentiment("c_267") => verschrikkelijk => (-0.9, 1.0) (Dutch Cornetto)
-        elif isinstance(s, basestring) and RE_SYNSET.match(s):
+        elif isinstance(s, str) and RE_SYNSET.match(s):
             a = [(s.synonyms[0],) + self.synset(s.id, pos=s.pos) + (None,)]
         # A string of words.
         # Sentiment("a horrible movie") => (-0.6, 1.0)
-        elif isinstance(s, basestring):
+        elif isinstance(s, str):
             a = self.assessments(((w.lower(), None) for w in " ".join(self.tokenizer(s)).split()), negation)
         # A pattern.en.Text.
         elif hasattr(s, "sentences"):
